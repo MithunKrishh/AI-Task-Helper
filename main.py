@@ -1,56 +1,55 @@
-# main.py
+# dynamic_prompt_with_functions_and_git.py
 
-from openai import OpenAI
+import subprocess
 import json
+from openai import OpenAI
 
 client = OpenAI()
 
-# --- System Prompt (RTFC framework) ---
-system_prompt = """
+# --- Dynamic Variables ---
+user_name = "Mithun"
+task_type = "Git workflow"
+file_name = "main.py"
+branch_name = "feature-dynamic-prompt"
+
+# --- Dynamic Prompt Construction ---
+system_prompt = f"""
 Role:
-You are an AI task assistant that helps users break down and solve coding, Git, and API-related tasks step by step.
+You are a coding assistant helping {user_name} with software development tasks.
 
 Task:
-Provide clear, structured, and beginner-friendly guidance for each request. 
-When needed, call functions with structured JSON.
+Guide the user in completing a {task_type}.
 
 Format:
-- Use numbered steps for instructions.
-- Provide code blocks for commands/code.
-- Keep the tone supportive and professional.
+- Provide clear steps.
+- Use commands with explanations.
+- Highlight common mistakes and fixes.
 
 Context:
-The AI Task Helper project integrates with OpenAI’s API to guide users through tasks like Git workflow, prompt engineering, code changes, and pull requests.
+This is part of an AI helper project that generates real-time {task_type} instructions 
+for files like {file_name} and helps create branches like {branch_name}.
+"""
+
+user_prompt = f"""
+I just updated {file_name}. 
+Please push my changes to a new branch {branch_name} and open a pull request.
 """
 
 # --- Define Functions for Function Calling ---
 functions = [
     {
-        "name": "get_git_commands",
-        "description": "Provides git commands for updating a file and creating a pull request",
+        "name": "git_push_branch",
+        "description": "Push changes to a new branch in Git and create a pull request",
         "parameters": {
             "type": "object",
             "properties": {
-                "branch_name": {
-                    "type": "string",
-                    "description": "The branch name for the PR"
-                },
-                "commit_message": {
-                    "type": "string",
-                    "description": "Commit message for the change"
-                }
+                "branch_name": {"type": "string", "description": "The name of the branch"},
+                "file_name": {"type": "string", "description": "The file being pushed"},
             },
-            "required": ["branch_name", "commit_message"]
+            "required": ["branch_name", "file_name"]
         }
     }
 ]
-
-# --- User Prompt ---
-user_prompt = """
-Help me implement function calling in this AI project. 
-Update the AI call with function definitions and demonstrate calling it. 
-Also guide me with Git commands to commit changes and create a pull request.
-"""
 
 # --- AI Call with Function Calling ---
 response = client.chat.completions.create(
@@ -60,32 +59,40 @@ response = client.chat.completions.create(
         {"role": "user", "content": user_prompt}
     ],
     functions=functions,
-    function_call="auto",  # auto-selects function if needed
+    function_call="auto",  # let the AI decide
     temperature=0.7,
-    top_p=0.9,
-    max_tokens=300
+    max_tokens=250
 )
 
-# --- Handle Function Call ---
+# --- Handle AI Response ---
 message = response.choices[0].message
 
 if message.get("function_call"):
-    function_name = message["function_call"]["name"]
+    func_name = message["function_call"]["name"]
     args = json.loads(message["function_call"]["arguments"])
 
-    if function_name == "get_git_commands":
-        branch = args["branch_name"]
-        commit_msg = args["commit_message"]
+    print(f"🔧 Function Call: {func_name}")
+    print(f"📂 With Arguments: {args}")
 
-        git_steps = f"""
-        # Git Workflow
-        git checkout -b {branch}
-        git add main.py
-        git commit -m "{commit_msg}"
-        git push origin {branch}
-        
-        # Then open GitHub and create a Pull Request from {branch} -> main
-        """
-        print(git_steps)
+    # --- Execute Git Commands ---
+    if func_name == "git_push_branch":
+        branch = args["branch_name"]
+        file = args["file_name"]
+
+        try:
+            # Stage file
+            subprocess.run(["git", "add", file], check=True)
+            # Commit changes
+            subprocess.run(["git", "commit", "-m", f"Update {file} with dynamic prompting"], check=True)
+            # Create new branch
+            subprocess.run(["git", "checkout", "-b", branch], check=True)
+            # Push branch
+            subprocess.run(["git", "push", "-u", "origin", branch], check=True)
+            # Create PR (needs GitHub CLI)
+            subprocess.run(["gh", "pr", "create", "--fill"], check=True)
+
+            print(f"✅ Successfully pushed {file} to branch {branch} and created a pull request.")
+        except subprocess.CalledProcessError as e:
+            print(f"❌ Git command failed: {e}")
 else:
     print(message["content"])
