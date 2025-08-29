@@ -1,31 +1,26 @@
-# main.py
 from openai import OpenAI
 
-def zero_shot_demo():
-    print("\n--- Zero Shot Prompting Demo ---")
+# Initialize the OpenAI client
+client = OpenAI()
 
-    prompt = "Translate the following English sentence into French: 'How are you today?'"
-    print(f"Prompt: {prompt}")
+def get_ai_response(prompt: str):
+    messages = [
+        {"role": "system", "content": "You are a helpful AI assistant."},
+        {"role": "user", "content": prompt},
+    ]
 
-    # Initialize client (make sure OPENAI_API_KEY is set in env)
-    client = OpenAI()
-
-    # Actual API call with top_p
     response = client.chat.completions.create(
-        model="gpt-3.5-turbo",
-        messages=[
-            {"role": "system", "content": "You are a helpful translator."},
-            {"role": "user", "content": prompt}
-        ],
-        max_tokens=100,
-        temperature=0.7,
-        top_p=0.9   # ✅ added top_p
+        model="gpt-4.1-mini",     # Model selection
+        messages=messages,        # Conversation history
+        temperature=0.7,          # Controls randomness
+        top_p=0.9,                # Nucleus sampling
+        top_k=50                  # Limits token selection to top K options
     )
 
-    # Extract text response
-    output = response.choices[0].message.content
-    print(f"AI Response: {output}")
-
+    # Extract the assistant's reply
+    return response.choices[0].message.content
 
 if __name__ == "__main__":
-    zero_shot_demo()
+    user_input = input("Enter your prompt: ")
+    reply = get_ai_response(user_input)
+    print("AI:", reply)
